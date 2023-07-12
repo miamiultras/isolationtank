@@ -1,13 +1,12 @@
 <script>
 	import { page } from '$app/stores';
-	import logo from '$lib/images/svelte-logo.svg';
 	import github from '$lib/images/github.svg';
 </script>
 
 <header>
 	<div class="corner">
 		<a href="https://kit.svelte.dev">
-			<img src={logo} alt="SvelteKit" />
+			<h3 class="font-color">Logo</h3>
 		</a>
 	</div>
 
@@ -40,6 +39,7 @@
 		background-size: contain;
 		padding: 0 2em;
 		border-bottom: 1px solid rgb(66, 66, 66);
+		font-family: 'Courier New', Courier, monospace;
 	}
 
 	.corner {
@@ -85,7 +85,7 @@
 	}
 
 	li[aria-current='page'] a {
-		border-bottom: 1px solid red;
+		border-bottom: 1px solid var(--color-theme-1);
 	}
 
 	nav a {
