@@ -39,6 +39,8 @@
 		justify-content: center;
 		align-items: center;
 		padding: 12px;
+		font-family: 'Courier New', Courier, monospace;
+		text-align: center;
 	}
 
 	footer a {
