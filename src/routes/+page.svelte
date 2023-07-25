@@ -6,7 +6,7 @@
 <section>
 	<div class="hero">
 		<h1 class="font-color">Isolation Tank</h1>
-		<h2 class="font-color">Create your own gallery</h2>
+		<h2 class="font-color">Lorem ipsum dolor</h2>
 	</div>
 </section>
 
