@@ -3,58 +3,142 @@
     import { onMount } from 'svelte';
 
     let playerBall;
+    let gameOver = false;
+    let playerAlive = true;  // New variable for life state
+    let animationFrameId;
+    let circles = [];  // Start with empty array
+
+    function getRandomPosition(max) {
+        return Math.floor(Math.random() * max);
+    }
+
+    function initializeCircles(width, height) {
+        return [
+            // Large, dangerous balls
+            { id: 1, x: 100, y: 100, size: 30, dx: 2, dy: 1 },
+            { id: 2, x: 600, y: 400, size: 40, dx: -2, dy: -1.5 },
+            { id: 3, x: 700, y: 200, size: 25, dx: -1.5, dy: 1 },
+            { id: 4, x: 500, y: 700, size: 35, dx: -1, dy: 1.5 },
+            // Small balls to eat
+            { id: 5, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 1, dy: 1 },
+            { id: 6, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -1, dy: 0.8 },
+            { id: 7, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: 0.7, dy: -1 },
+            { id: 8, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: -0.9, dy: 1.2 },
+            { id: 9, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 1.1, dy: -0.8 },
+            { id: 10, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -1.2, dy: 0.9 },
+            { id: 11, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: 0.8, dy: 1.1 },
+            { id: 12, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: -0.7, dy: -1.2 },
+            { id: 13, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: 1.3, dy: -0.7 },
+            { id: 14, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -0.8, dy: 1.3 },
+            { id: 15, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 0.9, dy: -1.1 },
+            { id: 16, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: -1.1, dy: 0.7 },
+            { id: 17, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: 1.2, dy: -0.9 },
+            { id: 18, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: -0.9, dy: 1.1 },
+            { id: 19, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: 0.7, dy: -1.3 },
+            { id: 20, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: -1.3, dy: 0.8 }
+        ];
+    }
 
     onMount(() => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
         playerBall = spring(
             { 
-                x: window.innerWidth / 2, 
-                y: window.innerHeight / 2, 
-                size: 20 
+                x: width / 2, 
+                y: height / 2, 
+                size: 20
             },
             {
-                stiffness: 0.1,
-                damping: 0.25
+                stiffness: 0.5,
+                damping: 0.5
             }
         );
-    });
 
-    let circles = [
-        { id: 1, x: 100, y: 100, size: 10 },
-        { id: 2, x: 200, y: 300, size: 15 },
-        { id: 3, x: 400, y: 300, size: 8 },
-        { id: 4, x: 600, y: 400, size: 12 },
-        { id: 5, x: 300, y: 500, size: 10 },
-        { id: 6, x: 700, y: 200, size: 7 },
-        { id: 7, x: 800, y: 600, size: 14 },
-        { id: 8, x: 500, y: 700, size: 9 }
-    ];
+        // Initialize circles with window dimensions
+        circles = initializeCircles(width, height);
+        
+        startGame();
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    });
 
     function checkCollision(x1, y1, r1, x2, y2, r2) {
         const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         return distance < r1 + r2;
     }
 
-    function handleMouseMove(event) {
-        if (!playerBall) return;
-        
-        const rect = event.currentTarget.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
+    function updateCircles() {
+        if (typeof window === 'undefined') return; // Guard against SSR
 
-        playerBall.set({ 
-            x: x, 
-            y: y, 
-            size: $playerBall.size 
+        circles = circles.map(circle => {
+            let newX = circle.x + circle.dx;
+            let newY = circle.y + circle.dy;
+
+            // Bounce off walls
+            if (newX < 0 || newX > window.innerWidth) circle.dx *= -1;
+            if (newY < 0 || newY > window.innerHeight) circle.dy *= -1;
+
+            return {
+                ...circle,
+                x: newX,
+                y: newY
+            };
         });
+    }
 
-        circles = circles.filter(circle => {
-            if (checkCollision(x, y, $playerBall.size, circle.x, circle.y, circle.size)) {
-                if ($playerBall.size > circle.size) {
-                    playerBall.update(ball => ({ ...ball, size: ball.size + circle.size * 0.2 }));
-                    return false;
+    function gameLoop() {
+        if (!gameOver && playerBall) {
+            updateCircles();
+            
+            // Check collisions with player
+            circles.forEach(circle => {
+                if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
+                                 circle.x, circle.y, circle.size)) {
+                    if ($playerBall.size > circle.size) {
+                        // Player eats the circle
+                        circles = circles.filter(c => c.id !== circle.id);
+                        playerBall.update(ball => ({ 
+                            ...ball, 
+                            size: ball.size + circle.size * 0.2 
+                        }));
+                    } else {
+                        // Player gets eaten
+                        gameOver = true;
+                        playerAlive = false;  // Use new variable
+                    }
                 }
-            }
-            return true;
+            });
+            
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function startGame() {
+        gameOver = false;
+        playerAlive = true;
+        if (circles.length < 5) {
+            window.location.reload(); // Restart game if too few balls remain
+        }
+        gameLoop();
+    }
+
+    function handleMouseMove(event) {
+        if (!playerBall || gameOver) return;
+        
+        const svg = event.currentTarget;
+        const rect = svg.getBoundingClientRect();
+        
+        // Calculate position relative to SVG
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        // Update ball position
+        playerBall.set({
+            x: mouseX,
+            y: mouseY,
+            size: $playerBall.size
         });
     }
 </script>
@@ -65,8 +149,13 @@
 </svelte:head>
 
 <div class="game-container">
-    <svg on:mousemove={handleMouseMove}>
-        {#if playerBall}
+    <svg 
+        role="application"
+        on:mousemove|preventDefault={handleMouseMove}
+        on:mouseenter={() => document.body.style.cursor = 'none'}
+        on:mouseleave={() => document.body.style.cursor = 'default'}
+    >
+        {#if playerBall && playerAlive}
             <circle 
                 class="player-ball" 
                 cx={$playerBall.x} 
@@ -77,13 +166,20 @@
 
         {#each circles as circle}
             <circle 
-                class="food-ball" 
+                class="food-ball {circle.size > 20 ? 'danger' : ''}" 
                 cx={circle.x} 
                 cy={circle.y} 
                 r={circle.size}
             />
         {/each}
     </svg>
+
+    {#if gameOver}
+        <div class="game-over">
+            <h2>Game Over!</h2>
+            <button on:click={() => window.location.reload()}>Play Again</button>
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -97,7 +193,9 @@
         background-size: cover, cover, cover;
         background-position: center;
         background-blend-mode: overlay, multiply, normal;
-        position: relative;
+        position: fixed;
+        top: 0;
+        left: 0;
         overflow: hidden;
     }
 
@@ -119,6 +217,8 @@
         height: 100%;
         position: relative;
         z-index: 2;
+        cursor: none; /* Hides cursor */
+        display: block;
     }
 
     .player-ball {
@@ -130,6 +230,39 @@
         fill: #d4a574;
         filter: drop-shadow(0 0 8px rgba(212, 165, 116, 0.6));
         animation: pulse 2s infinite ease-in-out;
+    }
+
+    .food-ball.danger {
+        fill: #ff4444;
+        filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+    }
+
+    .game-over {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: white;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 2rem;
+        border-radius: 1rem;
+        z-index: 3;
+    }
+
+    .game-over button {
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 1.2rem;
+        background: #8b4513;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+    }
+
+    .game-over button:hover {
+        background: #d4a574;
     }
 
     @keyframes pulse {
