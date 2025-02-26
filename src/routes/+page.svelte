@@ -17,25 +17,18 @@
 
 <style>
     .hero {
-        height: 100vh;
         width: 100vw;
-        background-image: url('./planet.webp');
-        background-size: cover;
+        height: 100vh;
+        background: 
+            linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+            radial-gradient(circle at 50% 50%, #3a2218 0%, #1a0f0a 100%),
+            url('./planet.webp');
+        background-size: cover, cover, cover;
         background-position: center;
+        background-blend-mode: overlay, multiply, normal;
         display: flex;
         align-items: center;
         justify-content: center;
-        position: relative;
-    }
-
-    .hero::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.75);
     }
 
     .content {

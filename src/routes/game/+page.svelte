@@ -93,7 +93,7 @@
         background: 
             linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
             radial-gradient(circle at 50% 50%, #3a2218 0%, #1a0f0a 100%),
-            url('/planets.webp');
+            url('../planet.webp');
         background-size: cover, cover, cover;
         background-position: center;
         background-blend-mode: overlay, multiply, normal;
