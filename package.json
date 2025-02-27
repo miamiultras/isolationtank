@@ -17,7 +17,7 @@
 		"@fontsource/fira-mono": "^4.5.10",
 		"@neoconfetti/svelte": "^1.0.0",
 		"@playwright/test": "^1.50.1",
-		"@sveltejs/adapter-auto": "^2.1.1",
+		"@sveltejs/adapter-vercel": "^3.1.0",
 		"@sveltejs/kit": "^1.30.4",
 		"@types/cookie": "^0.5.4",
 		"@typescript-eslint/eslint-plugin": "^5.62.0",
@@ -37,5 +37,8 @@
 		"vite": "^4.5.9",
 		"vitest": "^0.32.4"
 	},
-	"type": "module"
+	"type": "module",
+	"engines": {
+		"node": "^18.0.0"
+	}
 }
