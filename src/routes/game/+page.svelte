@@ -21,34 +21,40 @@
     let animationFrameId: number;
     let circles: Circle[] = [];
 
+    const BOARD_WIDTH = 3000;
+    const BOARD_HEIGHT = 3000;
+    let viewBox = { x: 0, y: 0, width: 0, height: 0 };
+
+    // Add spring for smooth viewport movement
+    let viewportSpring = spring(
+        { x: 0, y: 0 },
+        {
+            stiffness: 0.1,  // Lower value = smoother movement
+            damping: 0.8     // Higher value = less oscillation
+        }
+    );
+
     function getRandomPosition(max: number): number {
         return Math.floor(Math.random() * max);
     }
 
     function initializeCircles(width: number, height: number): Circle[] {
+        const smallBalls = Array.from({ length: 50 }, (_, i) => ({
+            id: i + 21,
+            x: getRandomPosition(BOARD_WIDTH),
+            y: getRandomPosition(BOARD_HEIGHT),
+            size: Math.random() * 3 + 4, // Size between 4 and 7
+            dx: (Math.random() - 0.5) * 2,
+            dy: (Math.random() - 0.5) * 2
+        }));
+
         return [
             // Large, dangerous balls
             { id: 1, x: 100, y: 100, size: 30, dx: 2, dy: 1 },
             { id: 2, x: 600, y: 400, size: 40, dx: -2, dy: -1.5 },
             { id: 3, x: 700, y: 200, size: 25, dx: -1.5, dy: 1 },
             { id: 4, x: 500, y: 700, size: 35, dx: -1, dy: 1.5 },
-            // Small balls to eat
-            { id: 5, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 1, dy: 1 },
-            { id: 6, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -1, dy: 0.8 },
-            { id: 7, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: 0.7, dy: -1 },
-            { id: 8, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: -0.9, dy: 1.2 },
-            { id: 9, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 1.1, dy: -0.8 },
-            { id: 10, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -1.2, dy: 0.9 },
-            { id: 11, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: 0.8, dy: 1.1 },
-            { id: 12, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: -0.7, dy: -1.2 },
-            { id: 13, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: 1.3, dy: -0.7 },
-            { id: 14, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: -0.8, dy: 1.3 },
-            { id: 15, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: 0.9, dy: -1.1 },
-            { id: 16, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: -1.1, dy: 0.7 },
-            { id: 17, x: getRandomPosition(width), y: getRandomPosition(height), size: 6, dx: 1.2, dy: -0.9 },
-            { id: 18, x: getRandomPosition(width), y: getRandomPosition(height), size: 5, dx: -0.9, dy: 1.1 },
-            { id: 19, x: getRandomPosition(width), y: getRandomPosition(height), size: 7, dx: 0.7, dy: -1.3 },
-            { id: 20, x: getRandomPosition(width), y: getRandomPosition(height), size: 4, dx: -1.3, dy: 0.8 }
+            ...smallBalls
         ];
     }
 
@@ -56,10 +62,19 @@
         const width: number = window.innerWidth;
         const height: number = window.innerHeight;
 
+        viewBox = {
+            x: (BOARD_WIDTH - width) / 2,
+            y: (BOARD_HEIGHT - height) / 2,
+            width: width,
+            height: height
+        };
+
+        viewportSpring.set({ x: viewBox.x, y: viewBox.y });
+
         playerBall = spring<Ball>(
             { 
-                x: width / 2, 
-                y: height / 2, 
+                x: BOARD_WIDTH / 2, 
+                y: BOARD_HEIGHT / 2, 
                 size: 20
             },
             {
@@ -68,7 +83,7 @@
             }
         );
 
-        circles = initializeCircles(width, height);
+        circles = initializeCircles(BOARD_WIDTH, BOARD_HEIGHT);
         startGame();
         
         return () => {
@@ -88,8 +103,9 @@
             let newX = circle.x + circle.dx;
             let newY = circle.y + circle.dy;
 
-            if (newX < 0 || newX > window.innerWidth) circle.dx *= -1;
-            if (newY < 0 || newY > window.innerHeight) circle.dy *= -1;
+            // Bounce off board boundaries instead of screen edges
+            if (newX < 0 || newX > BOARD_WIDTH) circle.dx *= -1;
+            if (newY < 0 || newY > BOARD_HEIGHT) circle.dy *= -1;
 
             return {
                 ...circle,
@@ -137,15 +153,41 @@
         
         const svg = event.currentTarget as SVGElement;
         const rect = svg.getBoundingClientRect();
+        const scale = viewBox.width / rect.width;
         
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        // Calculate mouse position relative to viewBox
+        const mouseX = (event.clientX - rect.left) * scale + $viewportSpring.x;
+        const mouseY = (event.clientY - rect.top) * scale + $viewportSpring.y;
+        
+        const newX = Math.max(0, Math.min(BOARD_WIDTH, mouseX));
+        const newY = Math.max(0, Math.min(BOARD_HEIGHT, mouseY));
         
         playerBall.set({
-            x: mouseX,
-            y: mouseY,
+            x: newX,
+            y: newY,
             size: $playerBall.size
         });
+
+        // Update viewBox with smoother following
+        const margin = viewBox.width / 3; // Increased margin for smoother transitions
+        let targetX = $viewportSpring.x;
+        let targetY = $viewportSpring.y;
+
+        if ($playerBall.x > $viewportSpring.x + viewBox.width - margin) {
+            targetX = Math.min(BOARD_WIDTH - viewBox.width, $playerBall.x - viewBox.width + margin);
+        } else if ($playerBall.x < $viewportSpring.x + margin) {
+            targetX = Math.max(0, $playerBall.x - margin);
+        }
+
+        if ($playerBall.y > $viewportSpring.y + viewBox.height - margin) {
+            targetY = Math.min(BOARD_HEIGHT - viewBox.height, $playerBall.y - viewBox.height + margin);
+        } else if ($playerBall.y < $viewportSpring.y + margin) {
+            targetY = Math.max(0, $playerBall.y - margin);
+        }
+
+        viewportSpring.set({ x: targetX, y: targetY });
+        viewBox.x = $viewportSpring.x;
+        viewBox.y = $viewportSpring.y;
     }
 </script>
 
@@ -157,6 +199,7 @@
 <div class="game-container">
     <svg 
         role="application"
+        viewBox="{$viewportSpring.x} {$viewportSpring.y} {viewBox.width} {viewBox.height}"
         on:mousemove|preventDefault={handleMouseMove}
         on:mouseenter={() => document.body.style.cursor = 'none'}
         on:mouseleave={() => document.body.style.cursor = 'default'}
@@ -220,7 +263,7 @@
 
     svg {
         width: 100%;
-        height: 100%;
+        height: 100vh;
         position: relative;
         z-index: 2;
         cursor: none; /* Hides cursor */
