@@ -3,13 +3,13 @@
 </script>
 
 <svelte:head>
-    <title>Space Absorber</title>
+    <title>Isolation Tank</title>
     <meta name="description" content="Become the largest entity in space" />
 </svelte:head>
 
 <div class="hero">
     <div class="content">
-        <h1>Space Absorber</h1>
+        <h1>Isolation Tank</h1>
         <p>Consume smaller entities. Grow larger. Dominate the cosmos.</p>
         <button on:click={() => goto('/game')}>Play Now</button>
     </div>

@@ -1,38 +1,32 @@
-# create-svelte
+# Isolation Tank
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+A browser-based game inspired by Agar.io, built with modern web technologies.
 
-## Creating a project
+## About
 
-If you're seeing this, you've probably already done this step. Congrats!
+Isolation Tank is an immersive experience where players navigate through a consciousness-expanding space. The gameplay mechanics are inspired by Agar.io's core concept of growth through absorption.
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+## Technical Stack
 
-# create a new project in my-app
-npm create svelte@latest my-app
-```
+- **Framework**: SvelteKit
+- **Animation**: Svelte/motion for smooth state transitions
+- **Styling**: Pure CSS with Svelte scoped styles
 
-## Developing
+## Development
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+To run the project locally:
 
 ```bash
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+## Features
 
-To create a production version of your app:
+- Smooth motion animations powered by Svelte/motion
+- Responsive design
+- Immersive visual experience
 
-```bash
-npm run build
-```
+## License
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+MIT

@@ -150,7 +150,7 @@
 </script>
 
 <svelte:head>
-    <title>Space Absorber - Game</title>
+    <title>Isolation Tank - Game</title>
     <meta name="description" content="Absorb smaller entities in space" />
 </svelte:head>
 
