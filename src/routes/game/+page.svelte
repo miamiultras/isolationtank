@@ -1,18 +1,31 @@
-<script>
+<script lang="ts">
     import { spring } from 'svelte/motion';
     import { onMount } from 'svelte';
+    import type { Spring } from 'svelte/motion';
 
-    let playerBall;
-    let gameOver = false;
-    let playerAlive = true;  // New variable for life state
-    let animationFrameId;
-    let circles = [];  // Start with empty array
+    interface Ball {
+        x: number;
+        y: number;
+        size: number;
+    }
 
-    function getRandomPosition(max) {
+    interface Circle extends Ball {
+        id: number;
+        dx: number;
+        dy: number;
+    }
+
+    let playerBall: Spring<Ball>;
+    let gameOver: boolean = false;
+    let playerAlive: boolean = true;
+    let animationFrameId: number;
+    let circles: Circle[] = [];
+
+    function getRandomPosition(max: number): number {
         return Math.floor(Math.random() * max);
     }
 
-    function initializeCircles(width, height) {
+    function initializeCircles(width: number, height: number): Circle[] {
         return [
             // Large, dangerous balls
             { id: 1, x: 100, y: 100, size: 30, dx: 2, dy: 1 },
@@ -40,10 +53,10 @@
     }
 
     onMount(() => {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const width: number = window.innerWidth;
+        const height: number = window.innerHeight;
 
-        playerBall = spring(
+        playerBall = spring<Ball>(
             { 
                 x: width / 2, 
                 y: height / 2, 
@@ -55,28 +68,26 @@
             }
         );
 
-        // Initialize circles with window dimensions
         circles = initializeCircles(width, height);
-        
         startGame();
+        
         return () => {
             cancelAnimationFrame(animationFrameId);
         };
     });
 
-    function checkCollision(x1, y1, r1, x2, y2, r2) {
+    function checkCollision(x1: number, y1: number, r1: number, x2: number, y2: number, r2: number): boolean {
         const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         return distance < r1 + r2;
     }
 
-    function updateCircles() {
-        if (typeof window === 'undefined') return; // Guard against SSR
+    function updateCircles(): void {
+        if (typeof window === 'undefined') return;
 
-        circles = circles.map(circle => {
+        circles = circles.map((circle: Circle) => {
             let newX = circle.x + circle.dx;
             let newY = circle.y + circle.dy;
 
-            // Bounce off walls
             if (newX < 0 || newX > window.innerWidth) circle.dx *= -1;
             if (newY < 0 || newY > window.innerHeight) circle.dy *= -1;
 
@@ -88,25 +99,22 @@
         });
     }
 
-    function gameLoop() {
+    function gameLoop(): void {
         if (!gameOver && playerBall) {
             updateCircles();
             
-            // Check collisions with player
-            circles.forEach(circle => {
+            circles.forEach((circle: Circle) => {
                 if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
                                  circle.x, circle.y, circle.size)) {
                     if ($playerBall.size > circle.size) {
-                        // Player eats the circle
                         circles = circles.filter(c => c.id !== circle.id);
-                        playerBall.update(ball => ({ 
+                        playerBall.update((ball: Ball) => ({ 
                             ...ball, 
                             size: ball.size + circle.size * 0.2 
                         }));
                     } else {
-                        // Player gets eaten
                         gameOver = true;
-                        playerAlive = false;  // Use new variable
+                        playerAlive = false;
                     }
                 }
             });
@@ -115,26 +123,24 @@
         }
     }
 
-    function startGame() {
+    function startGame(): void {
         gameOver = false;
         playerAlive = true;
         if (circles.length < 5) {
-            window.location.reload(); // Restart game if too few balls remain
+            window.location.reload();
         }
         gameLoop();
     }
 
-    function handleMouseMove(event) {
+    function handleMouseMove(event: MouseEvent): void {
         if (!playerBall || gameOver) return;
         
-        const svg = event.currentTarget;
+        const svg = event.currentTarget as SVGElement;
         const rect = svg.getBoundingClientRect();
         
-        // Calculate position relative to SVG
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
         
-        // Update ball position
         playerBall.set({
             x: mouseX,
             y: mouseY,
