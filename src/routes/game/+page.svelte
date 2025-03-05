@@ -34,6 +34,15 @@
         }
     );
 
+    // Add movement control variables
+    let keys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false
+    };
+    const PLAYER_SPEED = 5;
+
     function getRandomPosition(max: number): number {
         return Math.floor(Math.random() * max);
     }
@@ -115,9 +124,72 @@
         });
     }
 
+    function handleKeyDown(event: KeyboardEvent): void {
+        if (event.key in keys) {
+            keys[event.key as keyof typeof keys] = true;
+        }
+    }
+
+    function handleKeyUp(event: KeyboardEvent): void {
+        if (event.key in keys) {
+            keys[event.key as keyof typeof keys] = false;
+        }
+    }
+
+    function updatePlayerPosition(): void {
+        if (!playerBall || gameOver) return;
+
+        let dx = 0;
+        let dy = 0;
+
+        if (keys.ArrowLeft) dx -= PLAYER_SPEED;
+        if (keys.ArrowRight) dx += PLAYER_SPEED;
+        if (keys.ArrowUp) dy -= PLAYER_SPEED;
+        if (keys.ArrowDown) dy += PLAYER_SPEED;
+
+        // Normalize diagonal movement
+        if (dx !== 0 && dy !== 0) {
+            dx *= 0.707; // 1/√2
+            dy *= 0.707;
+        }
+
+        playerBall.update(ball => {
+            const newX = Math.max(0, Math.min(BOARD_WIDTH, ball.x + dx));
+            const newY = Math.max(0, Math.min(BOARD_HEIGHT, ball.y + dy));
+            
+            // Update viewBox with smoother following
+            const margin = viewBox.width / 3;
+            let targetX = $viewportSpring.x;
+            let targetY = $viewportSpring.y;
+
+            if (newX > $viewportSpring.x + viewBox.width - margin) {
+                targetX = Math.min(BOARD_WIDTH - viewBox.width, newX - viewBox.width + margin);
+            } else if (newX < $viewportSpring.x + margin) {
+                targetX = Math.max(0, newX - margin);
+            }
+
+            if (newY > $viewportSpring.y + viewBox.height - margin) {
+                targetY = Math.min(BOARD_HEIGHT - viewBox.height, newY - viewBox.height + margin);
+            } else if (newY < $viewportSpring.y + margin) {
+                targetY = Math.max(0, newY - margin);
+            }
+
+            viewportSpring.set({ x: targetX, y: targetY });
+            viewBox.x = $viewportSpring.x;
+            viewBox.y = $viewportSpring.y;
+
+            return {
+                ...ball,
+                x: newX,
+                y: newY
+            };
+        });
+    }
+
     function gameLoop(): void {
         if (!gameOver && playerBall) {
             updateCircles();
+            updatePlayerPosition(); // Add player position update to game loop
             
             circles.forEach((circle: Circle) => {
                 if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
@@ -147,49 +219,12 @@
         }
         gameLoop();
     }
-
-    function handleMouseMove(event: MouseEvent): void {
-        if (!playerBall || gameOver) return;
-        
-        const svg = event.currentTarget as SVGElement;
-        const rect = svg.getBoundingClientRect();
-        const scale = viewBox.width / rect.width;
-        
-        // Calculate mouse position relative to viewBox
-        const mouseX = (event.clientX - rect.left) * scale + $viewportSpring.x;
-        const mouseY = (event.clientY - rect.top) * scale + $viewportSpring.y;
-        
-        const newX = Math.max(0, Math.min(BOARD_WIDTH, mouseX));
-        const newY = Math.max(0, Math.min(BOARD_HEIGHT, mouseY));
-        
-        playerBall.set({
-            x: newX,
-            y: newY,
-            size: $playerBall.size
-        });
-
-        // Update viewBox with smoother following
-        const margin = viewBox.width / 3; // Increased margin for smoother transitions
-        let targetX = $viewportSpring.x;
-        let targetY = $viewportSpring.y;
-
-        if ($playerBall.x > $viewportSpring.x + viewBox.width - margin) {
-            targetX = Math.min(BOARD_WIDTH - viewBox.width, $playerBall.x - viewBox.width + margin);
-        } else if ($playerBall.x < $viewportSpring.x + margin) {
-            targetX = Math.max(0, $playerBall.x - margin);
-        }
-
-        if ($playerBall.y > $viewportSpring.y + viewBox.height - margin) {
-            targetY = Math.min(BOARD_HEIGHT - viewBox.height, $playerBall.y - viewBox.height + margin);
-        } else if ($playerBall.y < $viewportSpring.y + margin) {
-            targetY = Math.max(0, $playerBall.y - margin);
-        }
-
-        viewportSpring.set({ x: targetX, y: targetY });
-        viewBox.x = $viewportSpring.x;
-        viewBox.y = $viewportSpring.y;
-    }
 </script>
+
+<svelte:window 
+    on:keydown={handleKeyDown}
+    on:keyup={handleKeyUp}
+/>
 
 <svelte:head>
     <title>Isolation Tank - Game</title>
@@ -200,9 +235,6 @@
     <svg 
         role="application"
         viewBox="{$viewportSpring.x} {$viewportSpring.y} {viewBox.width} {viewBox.height}"
-        on:mousemove|preventDefault={handleMouseMove}
-        on:mouseenter={() => document.body.style.cursor = 'none'}
-        on:mouseleave={() => document.body.style.cursor = 'default'}
     >
         {#if playerBall && playerAlive}
             <circle 
