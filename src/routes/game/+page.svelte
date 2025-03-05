@@ -350,6 +350,7 @@
     <svg 
         role="application"
         viewBox="{$viewportSpring.x} {$viewportSpring.y} {viewBox.width} {viewBox.height}"
+        class={gameOver ? '' : 'hide-cursor'}
     >
         <!-- Add bubbles before the player ball for correct layering -->
         {#each bubbles as bubble (bubble.id)}
@@ -424,8 +425,11 @@
         height: 100vh;
         position: relative;
         z-index: 2;
-        cursor: none; /* Hides cursor */
         display: block;
+    }
+
+    .hide-cursor {
+        cursor: none;
     }
 
     .player-ball {
