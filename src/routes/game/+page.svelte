@@ -15,6 +15,22 @@
         dy: number;
     }
 
+    // Physics parameters
+    interface Physics {
+        velocity: { x: number; y: number };
+        acceleration: { x: number; y: number };
+    }
+    
+    let physics: Physics = {
+        velocity: { x: 0, y: 0 },
+        acceleration: { x: 0, y: 0 }
+    };
+
+    // Adjust physics constants
+    const ACCELERATION = 0.2;    // Reduced from 0.5
+    const MAX_SPEED = 6;         // Adjusted for better control
+    const FRICTION = 0.98;       // Increased for smoother deceleration
+
     let playerBall: Spring<Ball>;
     let gameOver: boolean = false;
     let playerAlive: boolean = true;
@@ -25,12 +41,21 @@
     const BOARD_HEIGHT = 3000;
     let viewBox = { x: 0, y: 0, width: 0, height: 0 };
 
-    // Add spring for smooth viewport movement
+    // Update viewport spring settings for smoother camera
     let viewportSpring = spring(
         { x: 0, y: 0 },
         {
-            stiffness: 0.1,  // Lower value = smoother movement
-            damping: 0.8     // Higher value = less oscillation
+            stiffness: 0.05,    // Reduced for smoother camera movement
+            damping: 0.9        // Increased for less oscillation
+        }
+    );
+
+    // Add position spring for player movement
+    let playerPositionSpring = spring(
+        { x: BOARD_WIDTH / 2, y: BOARD_HEIGHT / 2 },
+        {
+            stiffness: 0.3,
+            damping: 0.8
         }
     );
 
@@ -41,28 +66,93 @@
         ArrowLeft: false,
         ArrowRight: false
     };
-    const PLAYER_SPEED = 5;
+
+    interface Bubble {
+        id: number;
+        x: number;
+        y: number;
+        size: number;
+        opacity: number;
+        velocity: { x: number; y: number };
+    }
+
+    let bubbles: Bubble[] = [];
+    let nextBubbleId = 0;
+
+    function createBubble(x: number, y: number, velocity: { x: number; y: number }): Bubble {
+        return {
+            id: nextBubbleId++,
+            x,
+            y,
+            size: Math.random() * 3 + 2,
+            opacity: 0.6,
+            velocity: {
+                x: velocity.x * -0.3 + (Math.random() - 0.5) * 0.5,
+                y: velocity.y * -0.3 + (Math.random() - 0.5) * 0.5
+            }
+        };
+    }
+
+    function updateBubbles(): void {
+        bubbles = bubbles
+            .map(bubble => ({
+                ...bubble,
+                x: bubble.x + bubble.velocity.x,
+                y: bubble.y + bubble.velocity.y,
+                opacity: bubble.opacity - 0.02,
+                size: bubble.size * 0.98
+            }))
+            .filter(bubble => bubble.opacity > 0);
+
+        // Add new bubbles if player is moving
+        if (Math.abs(physics.velocity.x) > 0.1 || Math.abs(physics.velocity.y) > 0.1) {
+            const speed = Math.sqrt(physics.velocity.x ** 2 + physics.velocity.y ** 2);
+            if (Math.random() < speed / MAX_SPEED) {
+                const offset = Math.random() * $playerBall.size;
+                const angle = Math.random() * Math.PI * 2;
+                bubbles.push(
+                    createBubble(
+                        $playerBall.x + Math.cos(angle) * offset,
+                        $playerBall.y + Math.sin(angle) * offset,
+                        physics.velocity
+                    )
+                );
+            }
+        }
+    }
 
     function getRandomPosition(max: number): number {
         return Math.floor(Math.random() * max);
     }
 
     function initializeCircles(width: number, height: number): Circle[] {
-        const smallBalls = Array.from({ length: 50 }, (_, i) => ({
+        // Fewer small balls with bigger size
+        const smallBalls = Array.from({ length: 10 }, (_, i) => ({
             id: i + 21,
             x: getRandomPosition(BOARD_WIDTH),
             y: getRandomPosition(BOARD_HEIGHT),
-            size: Math.random() * 3 + 4, // Size between 4 and 7
+            size: Math.random() * 5 + 8, // Size between 8 and 13
             dx: (Math.random() - 0.5) * 2,
             dy: (Math.random() - 0.5) * 2
         }));
 
+        // Add medium balls with increased size
+        const mediumBalls = Array.from({ length: 15 }, (_, i) => ({
+            id: i + 41,
+            x: getRandomPosition(BOARD_WIDTH),
+            y: getRandomPosition(BOARD_HEIGHT),
+            size: Math.random() * 8 + 15, // Size between 15 and 23
+            dx: (Math.random() - 0.5) * 1.5,
+            dy: (Math.random() - 0.5) * 1.5
+        }));
+
         return [
             // Large, dangerous balls
-            { id: 1, x: 100, y: 100, size: 30, dx: 2, dy: 1 },
-            { id: 2, x: 600, y: 400, size: 40, dx: -2, dy: -1.5 },
-            { id: 3, x: 700, y: 200, size: 25, dx: -1.5, dy: 1 },
-            { id: 4, x: 500, y: 700, size: 35, dx: -1, dy: 1.5 },
+            { id: 1, x: 100, y: 100, size: 45, dx: 2, dy: 1 },
+            { id: 2, x: 600, y: 400, size: 55, dx: -2, dy: -1.5 },
+            { id: 3, x: 700, y: 200, size: 40, dx: -1.5, dy: 1 },
+            { id: 4, x: 500, y: 700, size: 50, dx: -1, dy: 1.5 },
+            ...mediumBalls,
             ...smallBalls
         ];
     }
@@ -84,11 +174,11 @@
             { 
                 x: BOARD_WIDTH / 2, 
                 y: BOARD_HEIGHT / 2, 
-                size: 20
+                size: 30  // Increased from 20 to 30
             },
             {
-                stiffness: 0.5,
-                damping: 0.5
+                stiffness: 0.3,  // Reduced for smoother movement
+                damping: 0.8     // Adjusted for better feel
             }
         );
 
@@ -139,67 +229,92 @@
     function updatePlayerPosition(): void {
         if (!playerBall || gameOver) return;
 
-        let dx = 0;
-        let dy = 0;
+        // Calculate acceleration based on key presses
+        physics.acceleration.x = 0;
+        physics.acceleration.y = 0;
 
-        if (keys.ArrowLeft) dx -= PLAYER_SPEED;
-        if (keys.ArrowRight) dx += PLAYER_SPEED;
-        if (keys.ArrowUp) dy -= PLAYER_SPEED;
-        if (keys.ArrowDown) dy += PLAYER_SPEED;
+        if (keys.ArrowLeft) physics.acceleration.x -= ACCELERATION;
+        if (keys.ArrowRight) physics.acceleration.x += ACCELERATION;
+        if (keys.ArrowUp) physics.acceleration.y -= ACCELERATION;
+        if (keys.ArrowDown) physics.acceleration.y += ACCELERATION;
 
-        // Normalize diagonal movement
-        if (dx !== 0 && dy !== 0) {
-            dx *= 0.707; // 1/√2
-            dy *= 0.707;
+        // Normalize diagonal acceleration
+        if (physics.acceleration.x !== 0 && physics.acceleration.y !== 0) {
+            physics.acceleration.x *= 0.707;
+            physics.acceleration.y *= 0.707;
         }
 
-        playerBall.update(ball => {
-            const newX = Math.max(0, Math.min(BOARD_WIDTH, ball.x + dx));
-            const newY = Math.max(0, Math.min(BOARD_HEIGHT, ball.y + dy));
-            
-            // Update viewBox with smoother following
-            const margin = viewBox.width / 3;
-            let targetX = $viewportSpring.x;
-            let targetY = $viewportSpring.y;
+        // Update velocity with acceleration
+        physics.velocity.x += physics.acceleration.x;
+        physics.velocity.y += physics.acceleration.y;
 
-            if (newX > $viewportSpring.x + viewBox.width - margin) {
-                targetX = Math.min(BOARD_WIDTH - viewBox.width, newX - viewBox.width + margin);
-            } else if (newX < $viewportSpring.x + margin) {
-                targetX = Math.max(0, newX - margin);
-            }
+        // Apply friction
+        physics.velocity.x *= FRICTION;
+        physics.velocity.y *= FRICTION;
 
-            if (newY > $viewportSpring.y + viewBox.height - margin) {
-                targetY = Math.min(BOARD_HEIGHT - viewBox.height, newY - viewBox.height + margin);
-            } else if (newY < $viewportSpring.y + margin) {
-                targetY = Math.max(0, newY - margin);
-            }
+        // Limit maximum speed
+        const speed = Math.sqrt(physics.velocity.x ** 2 + physics.velocity.y ** 2);
+        if (speed > MAX_SPEED) {
+            physics.velocity.x = (physics.velocity.x / speed) * MAX_SPEED;
+            physics.velocity.y = (physics.velocity.y / speed) * MAX_SPEED;
+        }
 
-            viewportSpring.set({ x: targetX, y: targetY });
-            viewBox.x = $viewportSpring.x;
-            viewBox.y = $viewportSpring.y;
+        // Update player position with velocity
+        const newX = Math.max(0, Math.min(BOARD_WIDTH, $playerPositionSpring.x + physics.velocity.x));
+        const newY = Math.max(0, Math.min(BOARD_HEIGHT, $playerPositionSpring.y + physics.velocity.y));
 
-            return {
-                ...ball,
-                x: newX,
-                y: newY
-            };
+        // Preserve the current size when updating position
+        const currentSize = $playerBall.size;
+
+        // Update position spring first
+        playerPositionSpring.set({ x: newX, y: newY });
+
+        // Then update player ball with spring position, explicitly maintaining size
+        playerBall.set({
+            x: $playerPositionSpring.x,
+            y: $playerPositionSpring.y,
+            size: currentSize  // Explicitly preserve the size
         });
+
+        // Update viewBox with much smoother following
+        const margin = viewBox.width / 2.5; // Increased margin
+        const centerX = $playerPositionSpring.x - viewBox.width / 2;
+        const centerY = $playerPositionSpring.y - viewBox.height / 2;
+
+        viewportSpring.set({ 
+            x: Math.max(0, Math.min(BOARD_WIDTH - viewBox.width, centerX)),
+            y: Math.max(0, Math.min(BOARD_HEIGHT - viewBox.height, centerY))
+        });
+
+        viewBox.x = $viewportSpring.x;
+        viewBox.y = $viewportSpring.y;
     }
 
     function gameLoop(): void {
         if (!gameOver && playerBall) {
             updateCircles();
-            updatePlayerPosition(); // Add player position update to game loop
+            updatePlayerPosition();
+            updateBubbles();
             
             circles.forEach((circle: Circle) => {
                 if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
                                  circle.x, circle.y, circle.size)) {
                     if ($playerBall.size > circle.size) {
+                        // Remove eaten circle first
                         circles = circles.filter(c => c.id !== circle.id);
-                        playerBall.update((ball: Ball) => ({ 
-                            ...ball, 
-                            size: ball.size + circle.size * 0.2 
-                        }));
+                        
+                        // Direct size update with larger growth factor
+                        const newSize = $playerBall.size + circle.size * 0.5;
+                        
+                        // Update the ball size directly
+                        playerBall.set({
+                            x: $playerBall.x,
+                            y: $playerBall.y,
+                            size: newSize
+                        });
+                        
+                        // Log for debugging
+                        console.log('Ball grown from', $playerBall.size, 'to', newSize);
                     } else {
                         gameOver = true;
                         playerAlive = false;
@@ -236,6 +351,17 @@
         role="application"
         viewBox="{$viewportSpring.x} {$viewportSpring.y} {viewBox.width} {viewBox.height}"
     >
+        <!-- Add bubbles before the player ball for correct layering -->
+        {#each bubbles as bubble (bubble.id)}
+            <circle 
+                class="bubble"
+                cx={bubble.x}
+                cy={bubble.y}
+                r={bubble.size}
+                style="opacity: {bubble.opacity}"
+            />
+        {/each}
+
         {#if playerBall && playerAlive}
             <circle 
                 class="player-ball" 
@@ -268,7 +394,7 @@
         width: 100vw;
         height: 100vh;
         background: 
-            linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+            linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
             radial-gradient(circle at 50% 50%, #3a2218 0%, #1a0f0a 100%),
             url('../planet.webp');
         background-size: cover, cover, cover;
@@ -303,19 +429,24 @@
     }
 
     .player-ball {
-        fill: #8b4513;
-        filter: drop-shadow(0 0 15px rgba(139, 69, 19, 0.7));
+        fill: #ff7f50;
+        filter: drop-shadow(0 0 15px rgba(255, 127, 80, 0.7));
     }
 
     .food-ball {
-        fill: #d4a574;
-        filter: drop-shadow(0 0 8px rgba(212, 165, 116, 0.6));
+        fill: #00ffff;
+        filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6));
         animation: pulse 2s infinite ease-in-out;
     }
 
     .food-ball.danger {
-        fill: #ff4444;
-        filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+        fill: #ff3333;
+        filter: drop-shadow(0 0 12px rgba(255, 51, 51, 0.8));
+    }
+
+    .bubble {
+        fill: rgba(255, 127, 80, 0.4);
+        filter: blur(1px);
     }
 
     .game-over {
