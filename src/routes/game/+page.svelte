@@ -395,7 +395,7 @@
         width: 100vw;
         height: 100vh;
         background: 
-            linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+            linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.7)),
             radial-gradient(circle at 50% 50%, #3a2218 0%, #1a0f0a 100%),
             url('../planet.webp');
         background-size: cover, cover, cover;
@@ -433,24 +433,24 @@
     }
 
     .player-ball {
-        fill: #ff7f50;
-        filter: drop-shadow(0 0 15px rgba(255, 127, 80, 0.7));
+        fill: #d4a574;
+        filter: drop-shadow(0 0 15px rgba(212, 165, 116, 0.7));
     }
 
     .food-ball {
-        fill: #00ffff;
-        filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.6));
+        fill: #8b4513;
+        filter: drop-shadow(0 0 8px rgba(139, 69, 19, 0.6));
         animation: pulse 2s infinite ease-in-out;
     }
 
     .food-ball.danger {
-        fill: #ff3333;
-        filter: drop-shadow(0 0 12px rgba(255, 51, 51, 0.8));
+        fill: #a13800;
+        filter: drop-shadow(0 0 12px rgba(161, 56, 0, 0.5));
     }
 
     .bubble {
-        fill: rgba(255, 127, 80, 0.4);
-        filter: blur(1px);
+        fill: rgba(212, 165, 116, 0.2); /* matching player ball color */
+        filter: blur(2px);
     }
 
     .game-over {
