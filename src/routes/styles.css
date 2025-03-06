@@ -115,3 +115,19 @@ button:focus:not(:focus-visible) {
     font-family: 'Nabla';
     font-palette: --myPalette;
 }
+
+.game-bg {
+    width: 100vw;
+    height: 100vh;
+    background: 
+        linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)),
+        radial-gradient(circle at 50% 50%, #3a2218 0%, #1a0f0a 100%),
+        url('$lib/images/planet.webp');
+    background-size: cover, cover, cover;
+    background-position: center;
+    background-blend-mode: overlay, multiply, normal;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+}
