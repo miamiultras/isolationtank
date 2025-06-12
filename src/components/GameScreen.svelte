@@ -40,12 +40,21 @@
         ArrowUp: false,
         ArrowDown: false,
         ArrowLeft: false,
-        ArrowRight: false
+        ArrowRight: false,
+        Space: false
     };
 
     let bubbles: Bubble[] = [];
     let nextBubbleId = 0;
     
+    // Speed boost system
+    let boostEnergy = 100; // 0-100%
+    let isBoostActive = false;
+    let boostTimeLeft = 0;
+    const BOOST_DURATION = 10000; // 10 seconds
+    const BOOST_COST = 50; // Energy cost
+    const ENERGY_PER_BALL = 8; // Energy gained per ball eaten
+
     // Dynamic visual effects
     $: currentSpeed = Math.sqrt(physics.velocity.x ** 2 + physics.velocity.y ** 2);
     $: isMoving = currentSpeed > 0.5;
@@ -55,6 +64,12 @@
         if (event.key in keys) {
             keys[event.key as keyof typeof keys] = true;
         }
+        
+        // Handle spacebar boost
+        if (event.key === ' ' && !isBoostActive && boostEnergy >= BOOST_COST) {
+            activateBoost();
+            event.preventDefault(); // Prevent page scroll
+        }
     }
 
     function handleKeyUp(event: KeyboardEvent): void {
@@ -63,12 +78,41 @@
         }
     }
 
+    function activateBoost(): void {
+        isBoostActive = true;
+        boostTimeLeft = BOOST_DURATION;
+        boostEnergy -= BOOST_COST;
+        
+        // Decrease size when boosting (strategic cost)
+        const currentSize = $playerBall.size;
+        const sizeCost = currentSize * 0.15; // 15% size reduction
+        playerBall.set({
+            ...$playerBall,
+            size: Math.max(gameConfig.INITIAL_PLAYER_SIZE, currentSize - sizeCost)
+        });
+        
+        // Countdown timer
+        const boostInterval = setInterval(() => {
+            boostTimeLeft -= 100;
+            if (boostTimeLeft <= 0) {
+                isBoostActive = false;
+                boostTimeLeft = 0;
+                clearInterval(boostInterval);
+            }
+        }, 100);
+    }
+
     function startGame(): void {
         gameOver = false;
         playerAlive = true;
         circles = initializeCircles(gameConfig);
         physics = { velocity: { x: 0, y: 0 }, acceleration: { x: 0, y: 0 } };
         bubbles = [];
+        
+        // Reset boost system
+        boostEnergy = 100;
+        isBoostActive = false;
+        boostTimeLeft = 0;
         
         playerBall.set({ 
             x: gameConfig.BOARD_WIDTH / 2, 
@@ -95,7 +139,7 @@
                 return { ...circle, x: newX, y: newY };
             });
 
-            physics = updatePhysics(physics, keys);
+            physics = updatePhysics(physics, keys, isBoostActive);
 
             const newPos = limitPosition(
                 $playerPositionSpring.x + physics.velocity.x,
@@ -128,6 +172,9 @@
                             ...$playerBall,
                             size: calculateGrowth($playerBall.size, circle.size)
                         });
+                        
+                        // Regenerate energy when eating balls
+                        boostEnergy = Math.min(100, boostEnergy + ENERGY_PER_BALL);
                     } else {
                         gameOver = true;
                         playerAlive = false;
@@ -227,6 +274,30 @@
             />
         {/each}
     </svg>
+
+    <!-- Boost UI -->
+    <div class="boost-ui">
+        <div class="energy-container">
+            <div class="energy-label">Energy</div>
+            <div class="energy-bar">
+                <div 
+                    class="energy-fill" 
+                    style="width: {boostEnergy}%"
+                    class:low-energy={boostEnergy < BOOST_COST}
+                ></div>
+            </div>
+            <div class="energy-text">{Math.round(boostEnergy)}%</div>
+        </div>
+        
+        {#if isBoostActive}
+            <div class="boost-active">
+                <div class="boost-label">🚀 BOOST ACTIVE</div>
+                <div class="boost-timer">{Math.ceil(boostTimeLeft / 1000)}s</div>
+            </div>
+        {:else if boostEnergy >= BOOST_COST}
+            <div class="boost-ready">Press SPACE for boost!</div>
+        {/if}
+    </div>
 
     {#if gameOver}
         <div class="game-over">
@@ -343,6 +414,109 @@
 
     .game-over button:hover {
         background: #d4a574;
+    }
+
+    /* Boost UI Styles */
+    .boost-ui {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        z-index: 10;
+        min-width: 200px;
+    }
+
+    .energy-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .energy-label {
+        color: white;
+        font-size: 0.9rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .energy-bar {
+        width: 100%;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .energy-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #8BC34A);
+        transition: width 0.3s ease, background 0.3s ease;
+        border-radius: 10px;
+    }
+
+    .energy-fill.low-energy {
+        background: linear-gradient(90deg, #FF5722, #FF9800);
+        animation: energyPulse 1s ease-in-out infinite alternate;
+    }
+
+    .energy-text {
+        color: white;
+        font-size: 0.8rem;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .boost-active {
+        text-align: center;
+        color: #FFD700;
+        font-weight: bold;
+        animation: boostGlow 0.5s ease-in-out infinite alternate;
+    }
+
+    .boost-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .boost-timer {
+        font-size: 1.2rem;
+        color: #FFF;
+    }
+
+    .boost-ready {
+        text-align: center;
+        color: #4CAF50;
+        font-size: 0.8rem;
+        font-weight: bold;
+        animation: readyPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes energyPulse {
+        0% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+
+    @keyframes boostGlow {
+        0% { 
+            text-shadow: 0 0 5px #FFD700;
+            transform: scale(1);
+        }
+        100% { 
+            text-shadow: 0 0 15px #FFD700, 0 0 25px #FFD700;
+            transform: scale(1.05);
+        }
+    }
+
+    @keyframes readyPulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
     }
 
     @keyframes pulse {

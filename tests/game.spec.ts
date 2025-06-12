@@ -21,28 +21,39 @@ test.describe('Game Functionality', () => {
         await expect(page.getByText(/grow and survive/i)).toBeVisible();
     });
 
-    test('shows game instructions content', async ({ page }) => {
+    test('shows game instructions content including boost mechanics', async ({ page }) => {
         // Check that action words are visible
         await expect(page.getByText('Absorb')).toBeVisible();
         await expect(page.getByText('Avoid')).toBeVisible();
         await expect(page.getByText('Grow')).toBeVisible();
+        await expect(page.getByText('Boost')).toBeVisible();
+        await expect(page.getByText('Eat')).toBeVisible();
         
-        // Check that arrow keys are displayed
+        // Check that control keys are displayed
         await expect(page.getByText('↑')).toBeVisible();
         await expect(page.getByText('←')).toBeVisible();
         await expect(page.getByText('↓')).toBeVisible();
         await expect(page.getByText('→')).toBeVisible();
+        await expect(page.getByText('SPACE')).toBeVisible();
+        
+        // Check boost instructions
+        await expect(page.getByText('boost (costs energy & size)')).toBeVisible();
+        await expect(page.getByText('for speed, but lose size & energy')).toBeVisible();
+        await expect(page.getByText('balls to regenerate energy')).toBeVisible();
     });
 
-    test('responds to keyboard input', async ({ page }) => {
+    test('responds to keyboard input including boost', async ({ page }) => {
         // Focus on the game area
         await page.locator('svg[role="application"]').focus();
         
-        // Test keyboard controls - these should not cause errors
+        // Test movement controls
         await page.keyboard.press('ArrowRight');
         await page.keyboard.press('ArrowUp');
         await page.keyboard.press('ArrowLeft');
         await page.keyboard.press('ArrowDown');
+        
+        // Test boost control
+        await page.keyboard.press('Space');
         
         // Game should still be running (SVG should be visible)
         await expect(page.locator('svg[role="application"]')).toBeVisible();

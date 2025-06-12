@@ -52,16 +52,18 @@ describe('GameScreen Component', () => {
         unmount();
     });
 
-    it('handles keyboard events', async () => {
+    it('handles keyboard events including boost activation', async () => {
         render(GameScreen);
         
-        // Test keydown
+        // Test arrow keys
         await fireEvent.keyDown(window, { key: 'ArrowRight' });
         await fireEvent.keyDown(window, { key: 'ArrowUp' });
-        
-        // Test keyup
         await fireEvent.keyUp(window, { key: 'ArrowRight' });
         await fireEvent.keyUp(window, { key: 'ArrowUp' });
+        
+        // Test spacebar boost activation
+        await fireEvent.keyDown(window, { key: ' ' });
+        await fireEvent.keyUp(window, { key: ' ' });
         
         // The component should handle these without errors
         expect(document.querySelector('svg')).toBeInTheDocument();

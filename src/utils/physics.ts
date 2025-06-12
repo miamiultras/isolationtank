@@ -8,13 +8,24 @@ export const PHYSICS_CONFIG = {
     BUBBLE_SPEED_THRESHOLD: 0.05,     // Even lower threshold for more bubbles
     BUBBLE_SPAWN_CHANCE: 0.9,         // Much higher chance for prominent trail
     BUBBLE_VELOCITY_MODIFIER: -0.4,   // More pronounced bubble movement
-    BUBBLE_RANDOM_FACTOR: 1.2         // More randomness for dynamic feel
+    BUBBLE_RANDOM_FACTOR: 1.2,        // More randomness for dynamic feel
+    BOOST_SPEED_MULTIPLIER: 2.5,      // Speed boost multiplier
+    BOOST_MAX_SPEED: 18               // Max speed during boost
 };
 
-export function updatePhysics(physics: Physics, keys: Record<string, boolean>): Physics {
+export function updatePhysics(physics: Physics, keys: Record<string, boolean>, isBoostActive = false): Physics {
+    let baseAcceleration = PHYSICS_CONFIG.ACCELERATION;
+    let maxSpeed = PHYSICS_CONFIG.MAX_SPEED;
+    
+    // Apply boost multipliers
+    if (isBoostActive) {
+        baseAcceleration *= PHYSICS_CONFIG.BOOST_SPEED_MULTIPLIER;
+        maxSpeed = PHYSICS_CONFIG.BOOST_MAX_SPEED;
+    }
+    
     const acceleration = {
-        x: (keys.ArrowRight ? PHYSICS_CONFIG.ACCELERATION : 0) - (keys.ArrowLeft ? PHYSICS_CONFIG.ACCELERATION : 0),
-        y: (keys.ArrowDown ? PHYSICS_CONFIG.ACCELERATION : 0) - (keys.ArrowUp ? PHYSICS_CONFIG.ACCELERATION : 0)
+        x: (keys.ArrowRight ? baseAcceleration : 0) - (keys.ArrowLeft ? baseAcceleration : 0),
+        y: (keys.ArrowDown ? baseAcceleration : 0) - (keys.ArrowUp ? baseAcceleration : 0)
     };
 
     if (acceleration.x !== 0 && acceleration.y !== 0) {
@@ -28,9 +39,9 @@ export function updatePhysics(physics: Physics, keys: Record<string, boolean>): 
     };
 
     const speed = calculateSpeed(velocity);
-    if (speed > PHYSICS_CONFIG.MAX_SPEED) {
-        velocity.x = (velocity.x / speed) * PHYSICS_CONFIG.MAX_SPEED;
-        velocity.y = (velocity.y / speed) * PHYSICS_CONFIG.MAX_SPEED;
+    if (speed > maxSpeed) {
+        velocity.x = (velocity.x / speed) * maxSpeed;
+        velocity.y = (velocity.y / speed) * maxSpeed;
     }
 
     return { velocity, acceleration };

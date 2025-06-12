@@ -5,20 +5,31 @@
 <div class="instructions {showInGame ? 'in-game' : ''}">
     <h2>How to Play</h2>
     <div class="controls">
-        <div class="arrows">
-            <span class="key">↑</span>
-            <div class="horizontal-arrows">
-                <span class="key">←</span>
-                <span class="key">↓</span>
-                <span class="key">→</span>
+        <div class="control-group">
+            <div class="arrows">
+                <span class="key">↑</span>
+                <div class="horizontal-arrows">
+                    <span class="key">←</span>
+                    <span class="key">↓</span>
+                    <span class="key">→</span>
+                </div>
             </div>
+            <span class="control-label">move</span>
         </div>
-        <span class="arrow-label">move</span>
+        
+        <div class="control-group">
+            <div class="single-key">
+                <span class="key space-key">SPACE</span>
+            </div>
+            <span class="control-label">boost (costs energy & size)</span>
+        </div>
     </div>
     <ul>
         <li><span class="highlight">Absorb</span> smaller entities</li>
         <li><span class="highlight">Avoid</span> larger entities</li>
         <li><span class="highlight">Grow</span> and survive</li>
+        <li><span class="highlight">Boost</span> for speed, but lose size & energy</li>
+        <li><span class="highlight">Eat</span> balls to regenerate energy</li>
     </ul>
 </div>
 
@@ -51,8 +62,15 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.5rem;
+        gap: 1rem;
         margin-bottom: 1.5rem;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .arrows {
@@ -65,6 +83,11 @@
     .horizontal-arrows {
         display: flex;
         gap: 0.3rem;
+    }
+
+    .single-key {
+        display: flex;
+        justify-content: center;
     }
 
     .key {
@@ -80,11 +103,17 @@
         margin: 0.2rem;
     }
 
-    .arrow-label {
+    .control-label {
         font-size: 0.9rem;
         text-transform: uppercase;
         letter-spacing: 0.1em;
         opacity: 0.8;
+        text-align: center;
+    }
+
+    .space-key {
+        min-width: 4rem;
+        font-size: 0.9rem;
     }
 
     ul {
