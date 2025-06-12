@@ -1,14 +1,14 @@
 import type { Physics } from './entities';
 
 export const PHYSICS_CONFIG = {
-    ACCELERATION: 0.3,
-    MAX_SPEED: 8,
-    FRICTION: 0.95,
+    ACCELERATION: 0.4,                // Increased for snappier response
+    MAX_SPEED: 10,                    // Increased max speed
+    FRICTION: 0.92,                   // Slightly less friction for more momentum
     DIAGONAL_MODIFIER: 0.707,
-    BUBBLE_SPEED_THRESHOLD: 0.08,     // Lower threshold for earlier bubble spawning
-    BUBBLE_SPAWN_CHANCE: 0.7,         // Higher chance to spawn bubbles
-    BUBBLE_VELOCITY_MODIFIER: -0.3,    // Keep the same velocity
-    BUBBLE_RANDOM_FACTOR: 0.8         // Keep the same randomness
+    BUBBLE_SPEED_THRESHOLD: 0.05,     // Even lower threshold for more bubbles
+    BUBBLE_SPAWN_CHANCE: 0.9,         // Much higher chance for prominent trail
+    BUBBLE_VELOCITY_MODIFIER: -0.4,   // More pronounced bubble movement
+    BUBBLE_RANDOM_FACTOR: 1.2         // More randomness for dynamic feel
 };
 
 export function updatePhysics(physics: Physics, keys: Record<string, boolean>): Physics {

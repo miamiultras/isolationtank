@@ -77,7 +77,9 @@ export function updateBubbles({ bubbles, playerX, playerY, velocity, nextBubbleI
 
     if (shouldSpawnBubble(velocity)) {
         let id = nextBubbleId;
-        for (let i = 0; i < 2; i++) {
+        // Spawn more bubbles for a more prominent trail
+        const bubbleCount = Math.ceil(Math.random() * 4) + 1; // 1-5 bubbles
+        for (let i = 0; i < bubbleCount; i++) {
             const bubbleVelocity = calculateBubbleVelocity(velocity);
             updatedBubbles.push(createBubble(playerX, playerY, bubbleVelocity, id++));
         }

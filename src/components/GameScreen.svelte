@@ -31,8 +31,8 @@
     let playerPositionSpring = spring(
         { x: gameConfig.BOARD_WIDTH / 2, y: gameConfig.BOARD_HEIGHT / 2 },
         {
-            stiffness: 0.2,
-            damping: 0.6
+            stiffness: 0.3,  // More bouncy
+            damping: 0.5     // Less damping for more dynamic movement
         }
     );
 
@@ -45,6 +45,11 @@
 
     let bubbles: Bubble[] = [];
     let nextBubbleId = 0;
+    
+    // Dynamic visual effects
+    $: currentSpeed = Math.sqrt(physics.velocity.x ** 2 + physics.velocity.y ** 2);
+    $: isMoving = currentSpeed > 0.5;
+    $: speedIntensity = Math.min(currentSpeed / 8, 1); // Normalize to 0-1
 
     function handleKeyDown(event: KeyboardEvent): void {
         if (event.key in keys) {
@@ -165,8 +170,8 @@
                 size: gameConfig.INITIAL_PLAYER_SIZE
             },
             {
-                stiffness: 0.3,
-                damping: 0.8
+                stiffness: 0.4,  // More responsive
+                damping: 0.6     // Less damping for bouncier feel
             }
         );
 
@@ -205,9 +210,11 @@
         {#if playerBall && playerAlive}
             <circle 
                 class="player-ball" 
+                class:moving={isMoving}
                 cx={$playerBall.x} 
                 cy={$playerBall.y} 
-                r={$playerBall.size}
+                r={$playerBall.size * (1 + speedIntensity * 0.1)}
+                style="--speed-intensity: {speedIntensity}; --current-speed: {currentSpeed}"
             />
         {/if}
 
@@ -265,6 +272,21 @@
     .player-ball {
         fill: #6F4E37;
         filter: drop-shadow(0 0 15px rgba(111, 78, 55, 0.7));
+        transition: filter 0.2s ease-out, r 0.1s ease-out;
+    }
+
+    .player-ball.moving {
+        filter: drop-shadow(0 0 calc(20px + 15px * var(--speed-intensity)) rgba(111, 78, 55, calc(0.8 + 0.4 * var(--speed-intensity))));
+        animation: playerPulse 0.3s ease-in-out infinite alternate;
+    }
+
+    @keyframes playerPulse {
+        0% { 
+            filter: drop-shadow(0 0 calc(20px + 15px * var(--speed-intensity)) rgba(111, 78, 55, calc(0.8 + 0.4 * var(--speed-intensity))));
+        }
+        100% { 
+            filter: drop-shadow(0 0 calc(25px + 20px * var(--speed-intensity)) rgba(111, 78, 55, calc(0.9 + 0.5 * var(--speed-intensity))));
+        }
     }
 
     .food-ball {
@@ -279,8 +301,20 @@
     }
 
     .bubble {
-        fill: rgba(111, 78, 55, 0.25);
-        filter: blur(3px) drop-shadow(0 0 3px rgba(111, 78, 55, 0.3));
+        fill: rgba(111, 78, 55, 0.35);
+        filter: blur(2px) drop-shadow(0 0 8px rgba(111, 78, 55, 0.5));
+        animation: bubbleFloat 1s ease-out forwards;
+    }
+
+    @keyframes bubbleFloat {
+        0% {
+            fill: rgba(111, 78, 55, 0.6);
+            filter: blur(1px) drop-shadow(0 0 12px rgba(111, 78, 55, 0.8));
+        }
+        100% {
+            fill: rgba(111, 78, 55, 0.1);
+            filter: blur(4px) drop-shadow(0 0 4px rgba(111, 78, 55, 0.2));
+        }
     }
 
     .game-over {
