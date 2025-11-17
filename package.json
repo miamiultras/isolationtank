@@ -18,7 +18,7 @@
 		"@neoconfetti/svelte": "^1.0.0",
 		"@playwright/test": "^1.56.1",
 		"@sveltejs/adapter-vercel": "^5.10.3",
-		"@sveltejs/kit": "^2.48.4",
+		"@sveltejs/kit": "^2.48.5",
 		"@sveltejs/vite-plugin-svelte": "^3.1.2",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.2.9",
