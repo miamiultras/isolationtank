@@ -28,7 +28,7 @@ describe('Instructions Component', () => {
         expect(screen.getByText(/absorb/i)).toBeInTheDocument();
         expect(screen.getByText(/avoid/i)).toBeInTheDocument();
         expect(screen.getByText(/grow/i)).toBeInTheDocument();
-        expect(screen.getByText(/boost/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/boost/i)).toHaveLength(2); // One in control label, one in instructions
         expect(screen.getByText(/eat/i)).toBeInTheDocument();
         expect(screen.getByText('smaller entities')).toBeInTheDocument();
         expect(screen.getByText('larger entities')).toBeInTheDocument();

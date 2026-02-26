@@ -38,6 +38,16 @@ export interface GameConfig {
     INITIAL_PLAYER_SIZE: number;
 }
 
+export interface HunterBall extends Circle {
+    targetX: number;
+    targetY: number;
+    huntingSpeed: number;
+    detectionRange: number;
+    isHunting: boolean;
+    lastPlayerX?: number;
+    lastPlayerY?: number;
+}
+
 export const gameConfig: GameConfig = {
     BOARD_WIDTH: 3000,
     BOARD_HEIGHT: 3000,

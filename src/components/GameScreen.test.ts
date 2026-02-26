@@ -55,6 +55,9 @@ describe('GameScreen Component', () => {
     it('handles keyboard events including boost activation', async () => {
         render(GameScreen);
         
+        // Wait for component to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
         // Test arrow keys
         await fireEvent.keyDown(window, { key: 'ArrowRight' });
         await fireEvent.keyDown(window, { key: 'ArrowUp' });
