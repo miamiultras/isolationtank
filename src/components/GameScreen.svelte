@@ -2,11 +2,11 @@
     import { spring } from 'svelte/motion';
     import { onMount } from 'svelte';
     import type { Spring } from 'svelte/motion';
-    import type { Ball, Circle, Physics, Bubble } from '../utils/entities';
+    import type { Ball, Circle, Physics, Bubble, HunterBall } from '../utils/entities';
     import { gameOver as gameOverStore, playerAlive as playerAliveStore } from '../stores/game';
     import { updatePhysics, limitPosition } from '../utils/physics';
     import { gameConfig } from '../utils/entities';
-    import { initializeCircles, checkCollision, calculateGrowth, updateBubbles } from '../utils/gameUtils';
+    import { initializeCircles, checkCollision, calculateGrowth, updateBubbles, createHunterBalls, updateHunterBalls } from '../utils/gameUtils';
 
     let physics: Physics = {
         velocity: { x: 0, y: 0 },
@@ -18,6 +18,7 @@
     let playerAlive: boolean = true;
     let animationFrameId: number;
     let circles: Circle[] = [];
+    let hunterBalls: HunterBall[] = [];
     let viewBox = { x: 0, y: 0, width: 0, height: 0 };
 
     let viewportSpring = spring(
@@ -79,6 +80,9 @@
     }
 
     function activateBoost(): void {
+        // Guard against accessing playerBall before it's initialized
+        if (!playerBall || !$playerBall) return;
+        
         isBoostActive = true;
         boostTimeLeft = BOOST_DURATION;
         boostEnergy -= BOOST_COST;
@@ -106,6 +110,7 @@
         gameOver = false;
         playerAlive = true;
         circles = initializeCircles(gameConfig);
+        hunterBalls = createHunterBalls(gameConfig);
         physics = { velocity: { x: 0, y: 0 }, acceleration: { x: 0, y: 0 } };
         bubbles = [];
         
@@ -139,6 +144,71 @@
                 return { ...circle, x: newX, y: newY };
             });
 
+            // Update hunter balls - proximity lock-on and movement mirroring
+            hunterBalls = hunterBalls.map((hunter) => {
+                const distanceToPlayer = Math.sqrt(
+                    Math.pow($playerBall.x - hunter.x, 2) + Math.pow($playerBall.y - hunter.y, 2)
+                );
+
+                // Start hunting when player gets close
+                if (distanceToPlayer <= 300 && !hunter.isHunting) {
+                    hunter.isHunting = true;
+                    // Initial lock-on direction
+                    const deltaX = $playerBall.x - hunter.x;
+                    const deltaY = $playerBall.y - hunter.y;
+                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    if (distance > 0) {
+                        hunter.dx = (deltaX / distance) * hunter.huntingSpeed;
+                        hunter.dy = (deltaY / distance) * hunter.huntingSpeed;
+                    }
+                }
+
+                if (hunter.isHunting) {
+                    // Mirror player movement direction while slowly adjusting course
+                    const playerMovementX = physics.velocity.x;
+                    const playerMovementY = physics.velocity.y;
+                    
+                    // Combine current direction with player movement (70% current, 30% player movement)
+                    hunter.dx = hunter.dx * 0.7 + playerMovementX * 0.3;
+                    hunter.dy = hunter.dy * 0.7 + playerMovementY * 0.3;
+                    
+                    // Slowly adjust toward player (very gradual course correction)
+                    const deltaX = $playerBall.x - hunter.x;
+                    const deltaY = $playerBall.y - hunter.y;
+                    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    
+                    if (distance > 0) {
+                        const correctionStrength = 0.05; // Very gentle correction
+                        const targetDx = (deltaX / distance) * hunter.huntingSpeed;
+                        const targetDy = (deltaY / distance) * hunter.huntingSpeed;
+                        
+                        hunter.dx = hunter.dx * (1 - correctionStrength) + targetDx * correctionStrength;
+                        hunter.dy = hunter.dy * (1 - correctionStrength) + targetDy * correctionStrength;
+                    }
+
+                    // Stop hunting if player gets too far away
+                    if (distanceToPlayer > 500) {
+                        hunter.isHunting = false;
+                    }
+                } else {
+                    // Random patrol when not hunting
+                    if (Math.abs(hunter.dx) < 0.5 && Math.abs(hunter.dy) < 0.5) {
+                        hunter.dx = (Math.random() - 0.5) * 1;
+                        hunter.dy = (Math.random() - 0.5) * 1;
+                    }
+                }
+
+                // Move exactly like regular balls
+                let newX = hunter.x + hunter.dx;
+                let newY = hunter.y + hunter.dy;
+
+                // Bounce off walls exactly like regular balls
+                if (newX < 0 || newX > gameConfig.BOARD_WIDTH) hunter.dx *= -1;
+                if (newY < 0 || newY > gameConfig.BOARD_HEIGHT) hunter.dy *= -1;
+
+                return { ...hunter, x: newX, y: newY };
+            });
+
             physics = updatePhysics(physics, keys, isBoostActive);
 
             const newPos = limitPosition(
@@ -162,16 +232,68 @@
                     $playerPositionSpring.y - viewBox.height / 2))
             });
 
-            // Check collisions
-            circles.forEach((circle) => {
+            // Ball vs Ball interactions - bigger eats smaller
+            for (let i = circles.length - 1; i >= 0; i--) {
+                const circle = circles[i];
+                let wasEaten = false;
+                
+                // Check against other circles
+                for (let j = circles.length - 1; j >= 0; j--) {
+                    if (i !== j) {
+                        const otherCircle = circles[j];
+                        if (checkCollision(circle.x, circle.y, circle.size, 
+                                         otherCircle.x, otherCircle.y, otherCircle.size)) {
+                            // Bigger eats smaller
+                            if (circle.size > otherCircle.size * 1.2) { // Need 20% size advantage
+                                circles[i].size = calculateGrowth(circle.size, otherCircle.size);
+                                circles.splice(j, 1);
+                                if (j < i) i--; // Adjust index after removal
+                                wasEaten = false;
+                                break;
+                            } else if (otherCircle.size > circle.size * 1.2) {
+                                circles[j].size = calculateGrowth(otherCircle.size, circle.size);
+                                circles.splice(i, 1);
+                                wasEaten = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (wasEaten) continue;
+                
+                // Check player vs circle collision
                 if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
                                  circle.x, circle.y, circle.size)) {
-                    if ($playerBall.size > circle.size) {
+                    if ($playerBall.size > circle.size * 1.1) { // Player needs smaller advantage
                         circles = circles.filter(c => c.id !== circle.id);
-                        playerBall.set({
-                            ...$playerBall,
-                            size: calculateGrowth($playerBall.size, circle.size)
-                        });
+                        
+                        // Smooth eating animation - gradual size increase
+                        const currentSize = $playerBall.size;
+                        const targetSize = calculateGrowth(currentSize, circle.size);
+                        const sizeIncrease = targetSize - currentSize;
+                        
+                        // Animate size growth over 200ms
+                        const growthSteps = 10;
+                        const stepSize = sizeIncrease / growthSteps;
+                        let step = 0;
+                        
+                        const growthInterval = setInterval(() => {
+                            step++;
+                            const newSize = currentSize + (stepSize * step);
+                            playerBall.set({
+                                ...$playerBall,
+                                size: newSize
+                            });
+                            
+                            if (step >= growthSteps) {
+                                clearInterval(growthInterval);
+                                playerBall.set({
+                                    ...$playerBall,
+                                    size: targetSize
+                                });
+                            }
+                        }, 20);
                         
                         // Regenerate energy when eating balls
                         boostEnergy = Math.min(100, boostEnergy + ENERGY_PER_BALL);
@@ -180,7 +302,95 @@
                         playerAlive = false;
                     }
                 }
-            });
+            }
+
+            // Hunter ball interactions
+            for (let i = hunterBalls.length - 1; i >= 0; i--) {
+                const hunter = hunterBalls[i];
+                let wasEaten = false;
+                
+                // Hunter vs regular circles
+                for (let j = circles.length - 1; j >= 0; j--) {
+                    const circle = circles[j];
+                    if (checkCollision(hunter.x, hunter.y, hunter.size, 
+                                     circle.x, circle.y, circle.size)) {
+                        if (hunter.size > circle.size * 1.1) {
+                            hunterBalls[i].size = calculateGrowth(hunter.size, circle.size);
+                            circles.splice(j, 1);
+                        } else if (circle.size > hunter.size * 1.3) { // Circles need bigger advantage vs hunters
+                            circles[j].size = calculateGrowth(circle.size, hunter.size);
+                            hunterBalls.splice(i, 1);
+                            wasEaten = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (wasEaten) continue;
+                
+                // Hunter vs hunter
+                for (let j = hunterBalls.length - 1; j >= 0; j--) {
+                    if (i !== j) {
+                        const otherHunter = hunterBalls[j];
+                        if (checkCollision(hunter.x, hunter.y, hunter.size, 
+                                         otherHunter.x, otherHunter.y, otherHunter.size)) {
+                            if (hunter.size > otherHunter.size * 1.2) {
+                                hunterBalls[i].size = calculateGrowth(hunter.size, otherHunter.size);
+                                hunterBalls.splice(j, 1);
+                                if (j < i) i--;
+                                break;
+                            } else if (otherHunter.size > hunter.size * 1.2) {
+                                hunterBalls[j].size = calculateGrowth(otherHunter.size, hunter.size);
+                                hunterBalls.splice(i, 1);
+                                wasEaten = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (wasEaten) continue;
+                
+                // Player vs hunter collision
+                if (checkCollision($playerBall.x, $playerBall.y, $playerBall.size, 
+                                 hunter.x, hunter.y, hunter.size)) {
+                    if ($playerBall.size > hunter.size * 1.15) { // Need 15% advantage vs hunters
+                        hunterBalls = hunterBalls.filter(h => h.id !== hunter.id);
+                        
+                        // Smooth eating animation for hunters too
+                        const currentSize = $playerBall.size;
+                        const targetSize = calculateGrowth(currentSize, hunter.size);
+                        const sizeIncrease = targetSize - currentSize;
+                        
+                        const growthSteps = 12; // Slightly longer for hunters
+                        const stepSize = sizeIncrease / growthSteps;
+                        let step = 0;
+                        
+                        const growthInterval = setInterval(() => {
+                            step++;
+                            const newSize = currentSize + (stepSize * step);
+                            playerBall.set({
+                                ...$playerBall,
+                                size: newSize
+                            });
+                            
+                            if (step >= growthSteps) {
+                                clearInterval(growthInterval);
+                                playerBall.set({
+                                    ...$playerBall,
+                                    size: targetSize
+                                });
+                            }
+                        }, 18);
+                        
+                        // Extra energy bonus for defeating a hunter!
+                        boostEnergy = Math.min(100, boostEnergy + ENERGY_PER_BALL * 2);
+                    } else {
+                        gameOver = true;
+                        playerAlive = false;
+                    }
+                }
+            }
 
             const { updatedBubbles, newNextBubbleId } = updateBubbles({
                 bubbles,
@@ -267,11 +477,29 @@
 
         {#each circles as circle}
             <circle 
-                class="food-ball {circle.size > 20 ? 'danger' : ''}" 
+                class="food-ball {circle.size > 40 ? 'giant-danger' : circle.size > 25 ? 'big-danger' : circle.size > 15 ? 'medium-threat' : circle.size > 8 ? 'small-food' : 'tiny-food'}" 
                 cx={circle.x} 
                 cy={circle.y} 
                 r={circle.size}
             />
+        {/each}
+
+        {#each hunterBalls as hunter}
+            <circle 
+                class="hunter-ball" 
+                class:hunting={hunter.isHunting}
+                cx={hunter.x} 
+                cy={hunter.y} 
+                r={hunter.size}
+            />
+            {#if hunter.isHunting}
+                <circle 
+                    class="hunter-detection-ring"
+                    cx={hunter.x} 
+                    cy={hunter.y} 
+                    r={hunter.detectionRange}
+                />
+            {/if}
         {/each}
     </svg>
 
@@ -361,14 +589,98 @@
     }
 
     .food-ball {
-        fill: #C4A484;
         filter: drop-shadow(0 0 8px rgba(196, 164, 132, 0.6));
         animation: pulse 2s infinite ease-in-out;
     }
 
-    .food-ball.danger {
-        fill: #4A0404;
-        filter: drop-shadow(0 0 12px rgba(74, 4, 4, 0.5));
+    /* Tiny food - very safe, bright green */
+    .food-ball.tiny-food {
+        fill: #4CAF50;
+        filter: drop-shadow(0 0 6px rgba(76, 175, 80, 0.7));
+    }
+
+    /* Small food - safe, light green */
+    .food-ball.small-food {
+        fill: #8BC34A;
+        filter: drop-shadow(0 0 8px rgba(139, 195, 74, 0.6));
+    }
+
+    /* Medium threat - neutral, yellow-orange */
+    .food-ball.medium-threat {
+        fill: #FF9800;
+        filter: drop-shadow(0 0 10px rgba(255, 152, 0, 0.6));
+    }
+
+    /* Big danger - threatening, red */
+    .food-ball.big-danger {
+        fill: #F44336;
+        filter: drop-shadow(0 0 12px rgba(244, 67, 54, 0.7));
+        animation: dangerPulse 1.5s infinite ease-in-out;
+    }
+
+    /* Giant danger - extreme threat, dark red */
+    .food-ball.giant-danger {
+        fill: #B71C1C;
+        filter: drop-shadow(0 0 15px rgba(183, 28, 28, 0.8));
+        animation: dangerPulse 1s infinite ease-in-out;
+    }
+
+    /* Hunter ball styles */
+    .hunter-ball {
+        fill: #2C1810;
+        stroke: #8B4513;
+        stroke-width: 2;
+        filter: drop-shadow(0 0 12px rgba(44, 24, 16, 0.8));
+        animation: hunterIdle 2.5s infinite ease-in-out;
+    }
+
+    .hunter-ball.hunting {
+        fill: #FF4444;
+        stroke: #CC0000;
+        stroke-width: 3;
+        filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.9));
+        animation: hunterHunt 0.8s infinite ease-in-out;
+    }
+
+    .hunter-detection-ring {
+        fill: none;
+        stroke: rgba(255, 68, 68, 0.3);
+        stroke-width: 2;
+        opacity: 0.5;
+        animation: detectionPulse 1.5s infinite ease-in-out;
+    }
+
+    @keyframes hunterIdle {
+        0%, 100% { 
+            transform: scale(1);
+            filter: drop-shadow(0 0 12px rgba(44, 24, 16, 0.8));
+        }
+        50% { 
+            transform: scale(1.05);
+            filter: drop-shadow(0 0 15px rgba(44, 24, 16, 0.9));
+        }
+    }
+
+    @keyframes hunterHunt {
+        0%, 100% { 
+            transform: scale(1);
+            filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.9));
+        }
+        50% { 
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 30px rgba(255, 68, 68, 1));
+        }
+    }
+
+    @keyframes detectionPulse {
+        0%, 100% { 
+            opacity: 0.2;
+            stroke-width: 2;
+        }
+        50% { 
+            opacity: 0.5;
+            stroke-width: 3;
+        }
     }
 
     .bubble {
@@ -523,5 +835,20 @@
         0% { opacity: 0.6; }
         50% { opacity: 1; }
         100% { opacity: 0.6; }
+    }
+
+    @keyframes dangerPulse {
+        0% { 
+            opacity: 0.8;
+            transform: scale(1);
+        }
+        50% { 
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        100% { 
+            opacity: 0.8;
+            transform: scale(1);
+        }
     }
 </style>
